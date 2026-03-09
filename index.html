@@ -1,64 +1,246 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Best website in World</title>
+  <title>CLOCK</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;900&display=swap" rel="stylesheet"/>
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan: #00ffe7;
+      --pink: #ff2d78;
+      --yellow: #ffe600;
+      --bg: #030309;
+      --grid: rgba(0, 255, 231, 0.04);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+    }
+
     body {
-      font-family: Comic Sans MS;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 0 20px;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: 'Share Tech Mono', monospace;
+      cursor: none;
     }
 
-    nav a {
-      margin-right: 15px;
-      text-decoration: none;
-      color: black;
+    /* Scanlines */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.15) 2px,
+        rgba(0,0,0,0.15) 4px
+      );
+      pointer-events: none;
+      z-index: 10;
     }
 
-    nav a:hover {
-      text-decoration: underline;
+    /* Grid floor */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
     }
 
-    hr {
-      margin: 20px 0;
+    canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 5;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      letter-spacing: 0.4em;
+      color: var(--pink);
+      text-transform: uppercase;
+      animation: flicker 4s infinite;
+    }
+
+    .clock {
+      font-family: 'Orbitron', monospace;
+      font-weight: 900;
+      font-size: clamp(4rem, 16vw, 11rem);
+      color: var(--cyan);
+      letter-spacing: 0.05em;
+      line-height: 1;
+      text-shadow:
+        0 0 10px var(--cyan),
+        0 0 30px var(--cyan),
+        0 0 80px rgba(0,255,231,0.4);
+      animation: flicker 6s infinite;
+    }
+
+    .date {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(1rem, 3vw, 1.6rem);
+      font-weight: 400;
+      color: var(--yellow);
+      letter-spacing: 0.2em;
+      text-shadow:
+        0 0 8px var(--yellow),
+        0 0 20px rgba(255,230,0,0.4);
+    }
+
+    .divider {
+      width: 300px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--pink), transparent);
+      box-shadow: 0 0 8px var(--pink);
+    }
+
+    .bottom-tag {
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      color: rgba(0,255,231,0.3);
+      text-transform: uppercase;
+    }
+
+    /* Glitch on clock every so often */
+    .clock.glitch {
+      animation: glitch 0.15s steps(2) forwards;
+    }
+
+    @keyframes flicker {
+      0%, 95%, 100% { opacity: 1; }
+      96% { opacity: 0.85; }
+      97% { opacity: 1; }
+      98% { opacity: 0.7; }
+      99% { opacity: 1; }
+    }
+
+    @keyframes glitch {
+      0%   { transform: translate(0); clip-path: inset(0 0 80% 0); color: var(--pink); }
+      25%  { transform: translate(-4px, 2px); clip-path: inset(30% 0 50% 0); }
+      50%  { transform: translate(4px, -2px); clip-path: inset(60% 0 20% 0); color: var(--yellow); }
+      75%  { transform: translate(-2px, 0); clip-path: inset(10% 0 70% 0); }
+      100% { transform: translate(0); clip-path: inset(0); color: var(--cyan); }
+    }
+
+    /* Custom cursor */
+    .cursor {
+      position: fixed;
+      width: 16px; height: 16px;
+      border: 1px solid var(--cyan);
+      box-shadow: 0 0 6px var(--cyan);
+      pointer-events: none;
+      z-index: 999;
+      transform: translate(-50%, -50%);
+      transition: transform 0.05s;
     }
   </style>
 </head>
 <body>
 
-  <nav>
-    <a href="#">I</a>
-    <a href="#">Have</a>
-    <a href="#">God Given Talent</a>
-  </nav>
+  <canvas id="rain"></canvas>
+  <div class="cursor" id="cursor"></div>
 
-  <hr>
+  <div class="wrap">
+    <p class="tag">// system time</p>
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="divider"></div>
+    <div class="date" id="date">LOADING...</div>
+    <p class="bottom-tag">uptime nominal — all systems online</p>
+  </div>
 
-  <h1>Incoming peak</h1>
-  <p>This will be big</p>
+  <script>
+    // Clock
+    const clockEl = document.getElementById('clock')
+    const dateEl = document.getElementById('date')
+    const days = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY']
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 
-  <hr>
+    function update() {
+      const now = new Date()
+      const h = now.getHours().toString().padStart(2,'0')
+      const m = now.getMinutes().toString().padStart(2,'0')
+      const s = now.getSeconds().toString().padStart(2,'0')
+      clockEl.textContent = `${h}:${m}:${s}`
+      const day = days[now.getDay()]
+      const date = now.getDate().toString().padStart(2,'0')
+      const month = months[now.getMonth()]
+      const year = now.getFullYear()
+      dateEl.textContent = `${day} // ${date} ${month} ${year}`
 
-  <footer>
-    <p>© 2026 My Website</p>
-  </footer>
+      // random glitch
+      if (Math.random() < 0.008) {
+        clockEl.classList.add('glitch')
+        setTimeout(() => clockEl.classList.remove('glitch'), 150)
+      }
+    }
+    setInterval(update, 1000)
+    update()
 
+    // Rain
+    const canvas = document.getElementById('rain')
+    const ctx = canvas.getContext('2d')
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+      initDrops()
+    })
+
+    const chars = 'ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789'
+    const fontSize = 14
+    let drops = []
+
+    function initDrops() {
+      const cols = Math.floor(canvas.width / fontSize)
+      drops = Array.from({length: cols}, () => Math.random() * -canvas.height / fontSize)
+    }
+    initDrops()
+
+    function drawRain() {
+      ctx.fillStyle = 'rgba(3,3,9,0.05)'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      drops.forEach((y, i) => {
+        const char = chars[Math.floor(Math.random() * chars.length)]
+        const alpha = Math.random() * 0.4 + 0.05
+        ctx.fillStyle = `rgba(0,255,231,${alpha})`
+        ctx.font = `${fontSize}px Share Tech Mono`
+        ctx.fillText(char, i * fontSize, y * fontSize)
+        if (y * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0
+        drops[i] += 0.5
+      })
+    }
+    setInterval(drawRain, 50)
+
+    // Cursor
+    const cursor = document.getElementById('cursor')
+    document.addEventListener('mousemove', e => {
+      cursor.style.left = e.clientX + 'px'
+      cursor.style.top = e.clientY + 'px'
+    })
+  </script>
 </body>
 </html>
-<h1 id="clock"></h1>
-
-<script>
-  function updateClock() {
-    const now = new Date()
-    const hours = now.getHours().toString().padStart(2, "0")
-    const minutes = now.getMinutes().toString().padStart(2, "0")
-    const seconds = now.getSeconds().toString().padStart(2, "0")
-    document.getElementById("clock").innerText = `${hours}:${minutes}:${seconds}`
-  }
-
-  setInterval(updateClock, 1000)
-  updateClock()
-</script>
